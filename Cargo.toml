@@ -1,0 +1,14 @@
+[package]
+name = "lua-comment-stripper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+analisar = "0.4"
+clap = { version = "4.5", features = ["derive"] }
+diff = "0.1"
+escrever = { git = "https://github.com/FreeMasen/escrever", rev = "76aec7fe291646381b8d784674afe17383d42236" }
+env_logger = "0.11"
+log = "0.4"
+lex_lua = "0.2"
+walkdir = "2.5"
