@@ -5,7 +5,7 @@ use std::{
 
 use clap::Parser;
 use lex_lua::{Span, SpannedLexer as Lexer, Token};
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -26,53 +26,62 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    log::debug!("Running against input: {}", args.input.display());
     if args.clean {
         std::fs::remove_dir_all(&args.output).ok();
         if let Some(diff) = &args.diff_dir {
             std::fs::remove_dir_all(&diff).ok();
         }
     }
-
+    walk_dir(args)
+}
+fn walk_dir(args: Args) {
     for entry in WalkDir::new(&args.input) {
-        let Ok(entry) = entry else {
+        let Some(entry) = should_strip(entry) else {
             continue;
         };
-        if entry.file_type().is_dir() {
+        
+        let Ok(orig) = std::fs::read(entry.path()) else {
             continue;
-        }
-        if !entry
-            .path()
-            .extension()
-            .map(|e| e == "lua")
-            .unwrap_or(false)
-        {
-            continue;
-        }
-        let orig = std::fs::read(entry.path()).expect("file not found");
+        };
         let stripped = do_one(&orig);
-        let dest_path = entry.path().strip_prefix(&args.input).expect("shared root");
-        let dest_path = args.output.join(dest_path);
-        let p = dest_path.parent().expect("non-root dest");
-        std::fs::create_dir_all(p).ok();
-        std::fs::write(&dest_path, &stripped).unwrap();
+        let Ok(entry_path_end) = entry.path().strip_prefix(&args.input) else {
+            continue;
+        };
+        let dest_path = args.output.join(entry_path_end);
+        if let Some(p) = dest_path.parent() {
+            std::fs::create_dir_all(p).ok();
+        }
+        if std::fs::write(&dest_path, &stripped).is_err() {
+            continue;
+        }
         if let Some(diff) = &args.diff_dir {
-            let diff_path = entry.path().strip_prefix(&args.input).expect("shared root");
-            let diff_path = diff.join(diff_path).with_extension("diff");
+            let diff_path = diff.join(entry_path_end).with_extension("diff");
             let changes = if args.diff_verbose {
                 generate_line_diff(&orig, &stripped, &entry.path(), &dest_path)
             } else {
                 generate_diff_from_tokens(&orig, &stripped, &entry.path(), &dest_path)
             };
             if let Some(changes) = changes {
-                let p = diff_path.parent().expect("non-root diff");
-                std::fs::create_dir_all(p).ok();
-                std::fs::write(&diff_path, changes).unwrap();
+                if let Some(p) = diff_path.parent() {
+                    std::fs::create_dir_all(p).ok();
+                }
+                std::fs::write(&diff_path, changes).ok();
             } else {
                 std::fs::remove_file(&diff_path).ok();
             }
         }
     }
+}
+
+fn should_strip(entry: Result<DirEntry, walkdir::Error>) -> Option<DirEntry> {
+    let entry = entry.ok()?;
+    (!entry.file_type().is_dir()).then_some(())?;
+    (!entry
+        .path()
+        .extension()
+        .map(|e| e == "lua")
+        .unwrap_or(false)).then_some(())?;
+    Some(entry)
 }
 
 /// Strip the comments from a single lua blob returning a transformed copy of the blob
@@ -82,7 +91,7 @@ fn do_one(lua: &[u8]) -> Vec<u8> {
     {
         let mut writer = escrever::Writer::new(&lua, &mut ret);
         while let Some(Ok(stmt)) = parser.next() {
-            writer.write_stmt(&stmt.statement).unwrap()
+            writer.write_stmt(&stmt.statement).ok();
         }
     }
     ret
