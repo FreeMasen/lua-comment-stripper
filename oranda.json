@@ -1,0 +1,8 @@
+{
+    "build": {
+        "path_prefix": "lua-comment-stripper"
+    },
+    "styles": {
+        "theme": "hacker"
+    }
+}
