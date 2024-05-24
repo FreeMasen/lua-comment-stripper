@@ -25,7 +25,6 @@ struct Args {
 }
 
 fn main() {
-    env_logger::init();
     let args = Args::parse();
     log::debug!("Running against input: {}", args.input.display());
     if args.clean {
@@ -66,20 +65,10 @@ fn main() {
                 generate_diff_from_tokens(&orig, &stripped, &entry.path(), &dest_path)
             };
             if let Some(changes) = changes {
-                log::debug!(
-                    "diff generated for {}/{}",
-                    entry.path().display(),
-                    dest_path.display()
-                );
                 let p = diff_path.parent().expect("non-root diff");
                 std::fs::create_dir_all(p).ok();
                 std::fs::write(&diff_path, changes).unwrap();
             } else {
-                log::debug!(
-                    "no diff generated for {}/{}",
-                    entry.path().display(),
-                    dest_path.display()
-                );
                 std::fs::remove_file(&diff_path).ok();
             }
         }
