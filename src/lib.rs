@@ -63,11 +63,35 @@ fn do_one(lua: &[u8]) -> Vec<u8> {
     let mut ret = Vec::new();
     {
         let mut writer = escrever::Writer::new(&lua, &mut ret);
-        while let Some(Ok(stmt)) = parser.next() {
+        while let Some(stmt) = parser.next() {
+            let stmt = match stmt {
+                Ok(stmt) => stmt,
+                Err(e) => {
+                    let msg = match e {
+                        analisar::Error::UnexpectedToken(offset, msg) => {
+                            let line = point_to_offset(lua, offset);
+                            format!("Unexpected token: {msg}\n{line}",)
+                        }
+                        _ => format!("Error parsing: {e}")
+                    };
+                    eprintln!("{msg}");
+                    std::process::exit(1);
+                }
+            };
             writer.write_stmt(&stmt.statement).ok();
         }
     }
     ret
+}
+
+fn point_to_offset(lua: &[u8], offset: usize) -> String {
+    let lua = String::from_utf8_lossy(lua);
+    let start = lua[..offset].rfind(|ch: char| ch == '\n').map(|idx| idx + 1).unwrap_or(0);
+    let position = offset - start;
+    let line = &lua[start..];
+    let end = line.find(|ch| ch == '\n').unwrap_or(line.len());
+    let line = &line[..end];
+    format!("{line}\n{:>width$}", '^', width = position)
 }
 
 /// Generate a verbose diff by comparing lines
