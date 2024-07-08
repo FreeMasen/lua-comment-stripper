@@ -11,7 +11,7 @@ pub fn walk_dir(input: PathBuf, output: PathBuf, diff_dir: Option<PathBuf>, diff
         let Some(entry) = should_strip(entry) else {
             continue;
         };
-        
+
         let Ok(orig) = std::fs::read(entry.path()) else {
             continue;
         };
@@ -48,11 +48,12 @@ pub fn walk_dir(input: PathBuf, output: PathBuf, diff_dir: Option<PathBuf>, diff
 fn should_strip(entry: Result<DirEntry, walkdir::Error>) -> Option<DirEntry> {
     let entry = entry.ok()?;
     (!entry.file_type().is_dir()).then_some(())?;
-    (!entry
+    (entry
         .path()
         .extension()
         .map(|e| e == "lua")
-        .unwrap_or(false)).then_some(())?;
+        .unwrap_or(false))
+    .then_some(())?;
     Some(entry)
 }
 
@@ -82,12 +83,8 @@ fn generate_line_diff(
     for v in diff::lines(&o, &s) {
         use diff::Result::*;
         match v {
-            Left(s) => {
-                ret.push_str(&format!("- {s}\n"))
-            }
-            Right(s) => {
-                ret.push_str(&format!("+ {s}\n"))
-            }
+            Left(s) => ret.push_str(&format!("- {s}\n")),
+            Right(s) => ret.push_str(&format!("+ {s}\n")),
             Both(_, _) => {}
         }
     }
