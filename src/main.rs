@@ -4,6 +4,7 @@ use clap::Parser;
 use lua_comment_stripper::walk_dir;
 
 #[derive(Debug, Parser)]
+#[clap(version, about, long_about = None)]
 struct Args {
     /// The input directory
     input: PathBuf,
